@@ -1,12 +1,13 @@
 import camelot
 import pymupdf
 
-
-def extract_tables(path: str) -> dict:
+def extract_tables(path: str):
     tables = camelot.read_pdf(path, pages="1-15", flavor="lattice")
 
     #save bounding boxes for each page
     table_bboxes = {}
+    table_data = [] #text of the tables
+
     for table in tables:
         page_num = table.page
         bbox = table._bbox  #PDF coordinates
@@ -14,7 +15,14 @@ def extract_tables(path: str) -> dict:
             table_bboxes[page_num] = []
         table_bboxes[page_num].append(bbox)
 
-    return table_bboxes
+        #save content to dataframe
+        table_data.append({
+            "page": page_num,
+            "data": table.df.to_dict(orient="records")
+        })
+
+
+    return table_bboxes, table_data
 
 
 def extract_text(path: str, table_bboxes: dict):
@@ -26,7 +34,7 @@ def extract_text(path: str, table_bboxes: dict):
         #if no boxes, extract whole page
         if page_num + 1 not in table_bboxes:
             text = page.get_text()
-            print(f"Strana {page_num + 1}: {len(text)} znakov")
+            print(f"Page {page_num + 1}: {len(text)} chars")
             continue
 
         #if there are any boxes, extract only parts
@@ -70,17 +78,10 @@ if __name__ == "__main__":
     #"attention is all you need" paper
     pdf_path = "../data/raw/attention_is_all_you_need.pdf"
 
-    table_bboxes = extract_tables(pdf_path)
+
+    table_bboxes, table_data = extract_tables(pdf_path)
 
     print("table bboxes",table_bboxes)
+    print("table data", table_data)
 
     extract_text(pdf_path, table_bboxes)
-
-
-
-
-
-
-
-
-
