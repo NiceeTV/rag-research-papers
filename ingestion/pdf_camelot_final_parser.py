@@ -38,7 +38,7 @@ def convert_camelot_bbox_to_pymupdf(bbox: tuple, page_height: float) -> tuple:
     return (x0, page_height - y1, x1, page_height - y0) #flip y axis
 
 
-def visualize_bboxes(pdf_path: str, bboxes_by_page: dict, output_path: str = "../data/ingestion/bbox_visualization_final.pdf"):
+def visualize_bboxes(pdf_path: str, bboxes_by_page: dict, output_path: str = "bbox_visualization_final.pdf"):
     """
         Draw bounding boxes from the parser on the original PDF.
     """
@@ -86,6 +86,8 @@ def extract_text(path: str, table_bboxes: dict):
     for page_num in range(len(doc)):
         page = doc[page_num]
         page_index = page_num + 1
+        page_height = page.rect.height
+        page_rect = page.rect #page dimensions
 
         #if no boxes, extract whole page
         if page_index not in table_bboxes:
@@ -95,17 +97,17 @@ def extract_text(path: str, table_bboxes: dict):
         #if there are any boxes, extract only parts
         bboxes = table_bboxes[page_index]
 
-        #page dimensions
-        page_rect = page.rect
+        #convert Camelot coords to pymupdf
+        converted_bboxes = [convert_camelot_bbox_to_pymupdf(bbox, page_height) for bbox in bboxes]
 
         #sort boxes by y-position for filtering by table boxes
-        bboxes.sort(key=lambda b: b[1])
+        converted_bboxes.sort(key=lambda b: b[1])
 
         #extract text between tables
         text_parts = []
         current_y = page_rect.y0 #top of the page
 
-        for bbox in bboxes:
+        for bbox in converted_bboxes:
             #extract text above the table
             if current_y < bbox[1]:
                 clip_rect = pymupdf.Rect(page_rect.x0, current_y, page_rect.x1, bbox[1])
@@ -179,7 +181,7 @@ if __name__ == "__main__":
         pdf_path=pdf_path,
         text_by_page=text_by_page,
         tables_data=table_data,
-        output_path="../data/extracted_document.json"
+        output_path="../chunking/extracted_document.json"
     )
 
     #visualize final detections
