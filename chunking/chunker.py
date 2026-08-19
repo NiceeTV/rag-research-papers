@@ -31,7 +31,7 @@ def detect_heading_patterns(text: str) -> list:
     while i < len(lines):
         line = lines[i].strip()
 
-        #Multiline header such as "1\nIntroduction" as seen in text
+        #multiline header such as "1\nIntroduction" as seen in text
         if re.match(r'^\d+$', line): #"1", "2", "3"
             j = i + 1
             while j < len(lines) and lines[j].strip() == '':
@@ -100,10 +100,14 @@ def detect_heading_patterns(text: str) -> list:
     return headings
 
 
-def chunk_by_headings(text: str, headings: list, min_chunk_size: int = 500) -> list:
+def chunk_by_headings(text: str, headings: list, min_tokens: int = 200, max_tokens: int = 1500, token_overlap=50) -> list:
     """
         Divide text by headers and merge small chunks to min_size.
     """
+    #min max size of chunk in tokens, appr. 1 token = 4 chars as per OpenAI
+    min_chars = min_tokens * 4  #200 tokens = 800 chars
+    max_chars = max_tokens * 4  #1500 tokens = 6000 chars
+
     #divide by headers
     raw_chunks = []
     for i, heading in enumerate(headings):
@@ -114,27 +118,75 @@ def chunk_by_headings(text: str, headings: list, min_chunk_size: int = 500) -> l
         raw_chunks.append({
             "content": content,
             "heading": heading['line'],
-            "size": len(content)
+            "size": len(content),
+            "tokens": len(content) // 4
         })
 
     #merge smaller chunks
     merged_chunks = []
     buffer = ""
+    overlap_content = ""
     current_heading = None
 
     for chunk in raw_chunks:
         if current_heading is None:
             current_heading = chunk['heading']
 
+        #add chunk content to buffer
         buffer += chunk['content'] + "\n\n"
 
         #if the buffer is big enough, save
-        if len(buffer) >= min_chunk_size:
-            merged_chunks.append({
-                "content": buffer.strip(),
-                "heading": current_heading,
-                "size": len(buffer)
-            })
+        if len(buffer) >= min_chars:
+
+            #check if it is too large
+            first_division = True
+            if len(buffer) > max_chars:
+
+                #keep dividing buffer while it is bigger than max_chars (max_tokens * 4)
+                while len(buffer) > max_chars:
+
+                    #do not overlap first part of the chunk, we do not want overlap from previous Section
+                    if len(merged_chunks) > 0 and not first_division:
+                        overlap_size = min(len(merged_chunks[-1]["content"]), token_overlap*4)
+                        print("last chunk", merged_chunks[-1]["content"], overlap_size)
+                        overlap_content = merged_chunks[-1]["content"][-overlap_size:]
+
+                    #add overlapped chunk to merged_chunks
+                    overlapped_chunk = overlap_content + buffer[:max_chars]
+                    merged_chunks.append({
+                        "content": overlapped_chunk.strip(),
+                        "heading": current_heading,
+                        "size": max_chars,
+                        "tokens": max_tokens
+                    })
+
+                    #cut buffer by max_chars
+                    buffer = buffer[max_chars:]
+                    first_division = False
+
+                #last division of the big chunk
+                if len(merged_chunks) > 0:
+                    overlap_size = min(len(merged_chunks[-1]["content"]), token_overlap * 4)
+                    overlap_content = merged_chunks[-1]["content"][-overlap_size:]
+
+                #add last part of the oversized chunk
+                overlapped_chunk = overlap_content + buffer[:max_chars]
+                merged_chunks.append({
+                    "content": overlapped_chunk.strip(),
+                    "heading": current_heading,
+                    "size": len(overlapped_chunk),
+                    "tokens": len(overlapped_chunk) // 4
+                })
+
+            #if the buffer is not oversized, just add it no overlap
+            else:
+                merged_chunks.append({
+                    "content": buffer.strip(),
+                    "heading": current_heading,
+                    "size": len(buffer),
+                    "tokens": len(buffer) // 4
+                })
+
             buffer = ""
             current_heading = None
 
@@ -143,7 +195,8 @@ def chunk_by_headings(text: str, headings: list, min_chunk_size: int = 500) -> l
         merged_chunks.append({
             "content": buffer.strip(),
             "heading": current_heading or "Last section",
-            "size": len(buffer)
+            "size": len(buffer),
+            "tokens": len(buffer) // 4
         })
 
     return merged_chunks
@@ -166,4 +219,4 @@ if __name__ == "__main__":
 
     merged_chunks = chunk_by_headings(merged_text, headings)
     for c in merged_chunks:
-        print(f"Header: '{c["heading"]}', size: '{c["size"]}', chunk: {c}")
+        print(f"Header: '{c["heading"]}', tokens: '{c["tokens"]}', chunk: {c}")
