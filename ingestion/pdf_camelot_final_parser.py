@@ -97,7 +97,7 @@ def find_caption_and_table_id(text: str, is_above: bool = False) -> tuple:
     is_figure = False
     match = re.search(r'Table\s+(\d+)[.:]?\s+', text, re.IGNORECASE)
     if not match:
-        print("neni match")
+        print("Not a match.")
 
         #is figure match
         match = re.search(r'Figure\s+(\d+)[.:]?\s+', text, re.IGNORECASE)
@@ -106,23 +106,17 @@ def find_caption_and_table_id(text: str, is_above: bool = False) -> tuple:
         else:
             is_figure = True
 
-
     table_id = int(match.group(1)) #"1", "2", "3", ...
-
-    print("je match", is_above, table_id)
-
     start = match.start()
 
     #find end of the caption
     if is_above:
         #take the remainder of the text after match
         caption = text[start:].strip()
-        print("above caption", caption, "endC")
 
         if caption:
             #max 4 lines above table
             caption_lines = caption.split('\n')
-            print("how many lines", len(caption_lines))
 
             if len(caption_lines) > 4:
                 return None, None
@@ -138,11 +132,10 @@ def find_caption_and_table_id(text: str, is_above: bool = False) -> tuple:
         ends = [e for e in [end1, end2] if e != -1]
         end = min(ends) if ends else len(text)
         caption = text[start:end].strip()
-        print("below caption", caption)
 
     #return caption is figure to filter out non-tables
     if is_figure:
-        print("figure detected", table_id)
+        print("Figure detected.", table_id)
         return "figure", table_id
 
     return caption, table_id
@@ -228,14 +221,12 @@ def extract_text(table_data: dict, opened_doc):
                 #extract words by using positions
                 words_above = filter_text_by_y(page_text, current_y, bbox[1])
                 text_above = build_text_from_words(words_above, is_above=True)
-                #print(f"txet above, page {page_index}",text_above)
 
                 if text_above.strip():
                     #find caption and table id
                     caption, table_id = find_caption_and_table_id(text_above, is_above=True)
                     if caption == "figure":
                         is_figure = True
-                    print("found?", table_id, caption)
 
                     if caption:
                         text_above = text_above.replace(caption, "").strip()
@@ -257,11 +248,11 @@ def extract_text(table_data: dict, opened_doc):
 
             if is_figure: #remove table, because it is a figure
                 del page_tables[i]
-                print("removing table",table,"on page", page_num)
+                print("Removing figure table",table,"on page", page_num)
 
             #add found caption nad table id to the tables
             page_tables[i]["id"] = f"{table_id if table_id else -1}"
-            page_tables[i]["caption"] = caption
+            page_tables[i]["caption"] = "unknown" if caption is None else caption
 
             #skip table part, skip to the end of the table
             current_y = bbox[3]
@@ -279,7 +270,7 @@ def extract_text(table_data: dict, opened_doc):
     return text_by_page
 
 
-def save_extracted_data(pdf_path: str, text_by_page: dict, tables_data: list, output_path: str):
+def save_extracted_data(pdf_path: str, text_by_page: dict, table_data: dict, output_path: str):
     """
         Save extracted data to JSON.
     """
@@ -297,11 +288,12 @@ def save_extracted_data(pdf_path: str, text_by_page: dict, tables_data: list, ou
         }
 
         #add tables on this page
-        for table in tables_data:
-            if table["page"] == page_num:
+        if page_num in table_data:
+            for table in table_data[page_num]:
                 page_data["tables"].append({
-                    "id": f"table_{len(page_data['tables']) + 1}",
-                    "data": table["data"]
+                    "id": table.get("id", f"table_{len(page_data['tables']) + 1}"),
+                    "caption": table.get("caption", ""), #table caption
+                    "data": table["content"] #table content
                 })
 
         doc["pages"].append(page_data)
@@ -333,12 +325,12 @@ if __name__ == "__main__":
     print("new data",table_data)
 
     #save final results to json
-    #save_extracted_data(
-    #    pdf_path=pdf_path,
-    #    text_by_page=text_by_page,
-    #    tables_data=table_data,
-    #    output_path="../chunking/extracted_document.json"
-    #)
+    save_extracted_data(
+        pdf_path=pdf_path,
+        text_by_page=text_by_page,
+        table_data=table_data,
+        output_path="../chunking/extracted_document.json"
+    )
 
     #visualize final detections
     visualize_bboxes(doc, table_data)
