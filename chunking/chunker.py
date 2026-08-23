@@ -202,6 +202,28 @@ def chunk_by_headings(text: str, headings: list, min_tokens: int = 200, max_toke
     return merged_chunks
 
 
+def save_chunks(chunks: list, output_path: str = "../chunking/chunks.json"):
+    """
+        Save chunks to JSON.
+    """
+    #serialize only valid chunks
+    serializable_chunks = []
+    for chunk in chunks:
+        serializable_chunks.append({
+            "content": chunk["content"],
+            "heading": chunk.get("heading", "unknown"),
+            "size": chunk.get("size", len(chunk["content"])),
+            "tokens": chunk.get("tokens", len(chunk["content"]) // 4)
+            # metadata môžeš pridať neskôr
+        })
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(serializable_chunks, f, indent=2, ensure_ascii=False)
+
+    print(f"✅ Uložených {len(serializable_chunks)} chunkov do {output_path}")
+    return serializable_chunks
+
+
 if __name__ == "__main__":
     #"attention is all you need" extracted json
     extracted_path = "extracted_document.json"
