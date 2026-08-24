@@ -1,0 +1,16 @@
+.cache/
+huggingface/
+*.gguf
+*.safetensors
+*.bin
+.env
+.env.local
+chroma_db/
+*.parquet
+*.sqlite3
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+env/
