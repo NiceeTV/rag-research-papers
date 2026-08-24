@@ -28,7 +28,7 @@ def clean_metadata(metadata: dict) -> dict:
     return cleaned
 
 
-def create_embeddings_and_store(chunks: list, db_path: str = "./chroma_db", token: str = ""):
+def create_embeddings_and_store(chunks: list, db_path: str = "./chroma_db"):
     """
         Create chunk embeddings and store them in ChromaDB.
     """
