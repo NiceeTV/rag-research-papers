@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RAG-research-papers</title>
+    <link rel="stylesheet" type="text/css" href="../static/main.css">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>    
+    <div class="container">
+        <div class="static_title">
+            <h1>RAG for research papers</h1>
+            <hr style="width:95%;">
+        </div>
+
+        <div class="chat_container">
+            <div class="upload_container">
+                <input type="file" id="file_input" accept=".pdf,application/pdf" hidden>
+                <button id="upload_btn" onclick="upload();">Upload PDF</button>
+                <div id="progress_container">
+                    <hr class="progress_bg">
+                    <hr id="progress_bar">
+                    <span id="progress_perc">10%</span>
+                </div>
+            </div>
+            
+            <div id="chat">
+                <div class="message"></div>
+                <div class="message.assistant"></div>
+                <div id="controls">
+                    <textarea id="message_area" placeholder="Input message ..."></textarea>
+                    <button id="message_send_btn">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+
+
+    <script type="text/javascript" src="../static/main.js"></script>
+</body>
+</html>
