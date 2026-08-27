@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 
 def extract_tables(path: str, opened_doc):
-    tables = camelot.read_pdf(path, pages="1-15", flavor="auto")
+    tables = camelot.read_pdf(path, pages="all", flavor="auto", parallel=True)
 
     #use camelot filter to filter out bad detections, better, but still bad detections
     clean_tables = tables.filter(min_rows=2, min_columns=2).filter(min_accuracy=50)
@@ -310,7 +310,7 @@ def save_extracted_data(pdf_path: str, text_by_page: dict, table_data: dict, out
 
 if __name__ == "__main__":
     #"attention is all you need" paper
-    pdf_path = "../data/raw/attention_is_all_you_need.pdf"
+    """pdf_path = "../data/raw/attention_is_all_you_need.pdf"
 
     #open pdf with pymupdf
     doc = pymupdf.open(pdf_path)
@@ -335,4 +335,4 @@ if __name__ == "__main__":
     )
 
     #visualize final detections
-    visualize_bboxes(doc, table_data)
+    visualize_bboxes(doc, table_data)"""

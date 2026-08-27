@@ -65,10 +65,17 @@ h1, h2, h3 {
 	color: #4d4d4d;
 	width: fit-content;
 	font-size: 25px;
+	cursor: pointer;
+	transition: background-color 0.5s ease;
 }
 
-#upload_btn:hover {
-	background-color: #bfbfbf; 
+#upload_btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+#upload_btn:not(:disabled):hover {
+	background-color: #bfbfbf;
 }
 
 #progress_container {
@@ -219,4 +226,25 @@ h1, h2, h3 {
 
 #message_send_btn:hover {
 	background-color: #cccccc;
+}
+
+/* msg container */
+#msg_container {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.message, .message.assistant {
+	align-self: flex-end;
+	padding: 10px 14px;
+	background-color: lightblue;
+	border: 1px solid #bfbfbf;
+	border-radius: 15px;
+	font-size: 18px;
+}
+
+.message.assistant {
+	align-self: flex-start;
+	background-color: lightcyan;
 }

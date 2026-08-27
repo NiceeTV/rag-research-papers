@@ -1,11 +1,18 @@
 import os
 from dotenv import load_dotenv
 import json
-import transformers
-transformers.logging.set_verbosity_info()
-from sentence_transformers import SentenceTransformer
+
 import chromadb
 from chromadb.config import Settings
+
+
+def load_embedder():
+    import transformers
+    transformers.logging.set_verbosity_info()
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer("BAAI/bge-small-en-v1.5")
+    return model
+
 
 def load_chunks(chunks_path: str) -> list:
     """
@@ -28,14 +35,15 @@ def clean_metadata(metadata: dict) -> dict:
     return cleaned
 
 
-def create_embeddings_and_store(chunks: list, db_path: str = "./chroma_db"):
+def create_embeddings_and_store(chunks: list, model, db_path: str = "./chroma_db"):
     """
         Create chunk embeddings and store them in ChromaDB.
     """
+    print("Embedding chunks.")
     #load embedding model
-    print("Loading embedding model.")
-    model = SentenceTransformer("BAAI/bge-small-en-v1.5")
-    print(f"   Model loaded, dimensions: {model.get_embedding_dimension()}")
+    #print("Loading embedding model.")
+    #model = SentenceTransformer("BAAI/bge-small-en-v1.5")
+    #print(f"   Model loaded, dimensions: {model.get_embedding_dimension()}")
 
     #prepare data for embedding
     texts = [chunk["content"] for chunk in chunks]
@@ -85,10 +93,10 @@ def create_embeddings_and_store(chunks: list, db_path: str = "./chroma_db"):
     )
 
     print(f"Saved {collection.count()} chunks to ChromaDB")
-    return client, collection, model
+    return client, collection
 
 
-def search_chunks(query: str, collection, model, top_k: int = 5) -> dict:
+def search_chunks(query: str, collection, model, top_k: int = 3) -> dict:
     """
         Search relevant chunks for the question.
     """
@@ -107,7 +115,7 @@ def search_chunks(query: str, collection, model, top_k: int = 5) -> dict:
 
 if __name__ == "__main__":
     #load HF token
-    load_dotenv()
+    """load_dotenv()
     HF_TOKEN = os.getenv("HF_TOKEN")
 
     #load chunks
@@ -134,4 +142,4 @@ if __name__ == "__main__":
         print(f"Heading: {metadata.get('heading', 'unknown')}")
         print(f"Type: {metadata.get('type', 'text')}")
         print(f"Page: {metadata.get('page', 0)}")
-        print(f"Content: {doc[:200]}...")
+        print(f"Content: {doc[:200]}...")"""

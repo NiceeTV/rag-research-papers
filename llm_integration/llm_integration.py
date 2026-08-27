@@ -1,12 +1,12 @@
 from llama_cpp import Llama
 
-def load_llm():
+def load_llm(llm_path):
     """
         Load llm model for answering questions.
     """
     print("Loading Llama 3.2...")
     llm = Llama(
-        model_path="../models/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+        model_path=llm_path,
         n_ctx=4096,
         n_gpu_layers=-1,  #
         n_threads=6,

@@ -101,7 +101,7 @@ def detect_heading_patterns(text: str) -> list:
     return headings
 
 
-def chunk_large_table(df, caption: str, table_id: str, max_tokens: int = 1500, max_rows: int = 20) -> list:
+def chunk_large_table(df, caption: str, table_id: str, max_tokens: int = 1000, max_rows: int = 20) -> list:
     """
         Divide oversized table to smaller chunks.
     """
@@ -141,13 +141,13 @@ def chunk_large_table(df, caption: str, table_id: str, max_tokens: int = 1500, m
     return chunks
 
 
-def chunk_content(text: str, headings: list, tables: list, min_tokens: int = 200, max_tokens: int = 1500, token_overlap=50) -> list:
+def chunk_content(text: str, headings: list, tables: list, min_tokens: int = 200, max_tokens: int = 1000, token_overlap=50) -> list:
     """
         Divide text by headers and merge small chunks to min_size.
     """
     #min max size of chunk in tokens, appr. 1 token = 4 chars as per OpenAI
     min_chars = min_tokens * 4 #200 tokens = 800 chars
-    max_chars = max_tokens * 4 #1500 tokens = 6000 chars
+    max_chars = max_tokens * 4 #1000 tokens = 4000 chars
 
     #divide by headers
     raw_chunks = []
@@ -302,7 +302,7 @@ def save_chunks(chunks: list, output_path: str = "../chunking/chunks.json"):
 
 if __name__ == "__main__":
     #"attention is all you need" extracted json
-    extracted_path = "extracted_document.json"
+    """extracted_path = "extracted_document.json"
 
     with open(extracted_path, "r", encoding="utf-8") as f:
         doc = json.load(f)
@@ -329,4 +329,4 @@ if __name__ == "__main__":
         print(f"Header: '{c["heading"]}', tokens: '{c["tokens"]}', chunk: {c}")
 
     #save chunks to file
-    save_chunks(merged_chunks)
+    save_chunks(merged_chunks)"""
