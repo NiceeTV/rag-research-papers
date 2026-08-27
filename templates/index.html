@@ -5,6 +5,7 @@
     <link rel="stylesheet" type="text/css" href="../static/main.css">
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 </head>
 <body>    
     <div class="container">
@@ -17,20 +18,31 @@
             <div class="upload_container">
                 <input type="file" id="file_input" accept=".pdf,application/pdf" hidden>
                 <button id="upload_btn" onclick="upload();">Upload PDF</button>
+                <div id="fileInfo"></div>
                 <div id="progress_container">
-                    <hr class="progress_bg">
-                    <hr id="progress_bar">
-                    <span id="progress_perc">10%</span>
+                    <span id="processed_file">asfafs_final_final.pdf</span>
+
+                    <div class="progress-row">
+                        <div class="progress-wrapper">
+                            <div class="progress_bg"></div>
+                            <div id="progress_bar"></div>
+                        </div>
+                        <span id="progress_perc">10%</span>
+                    </div>
+                    
+                    <span id="progress_ws">(1/5) LLM-processing ...</span>
                 </div>
             </div>
             
-            <div id="chat">
+            <div style="height: 100%; width:100%; display: flex; flex-direction: column; align-items: center;">
+                <div id="chat">
                 <div class="message"></div>
                 <div class="message.assistant"></div>
                 <div id="controls">
                     <textarea id="message_area" placeholder="Input message ..."></textarea>
                     <button id="message_send_btn">Send</button>
                 </div>
+            </div>
             </div>
         </div>
     </div>
