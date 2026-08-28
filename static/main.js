@@ -164,6 +164,7 @@ function send_msg_to_cont(message="", role="user", srcs="") {
 
     /* add to container */
     msg_cont.appendChild(el);
+    return el;
 }
 
 
@@ -305,6 +306,25 @@ socket.on('pipeline-status', (data) => {
 socket.on('ask-answer', (data) => {
     send_msg_to_cont(data.answer, "assistant", data.sources);
 });
+
+/* answer streaming */
+let answer_stream = null;
+
+socket.on('answer-start', (data) => {
+    answer_stream = send_msg_to_cont("", "assistant", data.sources);
+});
+
+socket.on('answer-token', (data) => {
+    if (answer_stream) {
+        answer_stream.textContent += data.token;
+    }
+});
+
+socket.on('answer-done', (data) => {
+    answer_stream = null;
+});
+
+
 
 /* when models are loaded, signal will come */
 socket.on('model-ready', (data) => {

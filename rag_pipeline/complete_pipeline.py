@@ -15,7 +15,7 @@ class RAG_pipeline:
         self.llm = llm
         self.chroma_db = chroma_db_path
         self.socketio = socketio
-        self.chunk_revelance_threshold = 0.35
+        self.chunk_revelance_threshold = 0.5
 
 
     def send_ws_state(self, state:str = "unknown", part:int = 1):
@@ -83,35 +83,50 @@ class RAG_pipeline:
         documents = results['documents'][0]
         metadata = results['metadatas'][0]
         distances = results['distances'][0]
-        context = "\n\n---\n\n".join(documents)
 
         #discard if no good chunks are found
-        best_distance = min(distances)
-        if best_distance > self.chunk_revelance_threshold:
+        filtered = []
+        context = ""
+        for doc, meta, dist in zip(documents, metadata, distances):
+            if dist <= self.chunk_revelance_threshold:
+                filtered.append({
+                    "content": doc,
+                    "metadata": meta,
+                    "distance": dist
+                })
+
+                context += doc + "\n\n---\n\n"
+
+        #no good chunks were found
+        if not filtered:
             return {
                 "query": query,
                 "answer": "I don't know based on the provided documents.",
                 "sources": []
             }
 
-
         token_appr = len(context) // 4
         if token_appr > 4096:
-            answer = "This question exceeds the model context."
+            return {
+                "query": query,
+                "answer": "This question exceeds the model context.",
+                "sources": [],
+            }
+
         else:
-            answer = ask_with_context(self.llm, query, context)
+            sources = []
+            for m in metadata:
+                sources.append(m.get("heading", "unknown"))
 
-        sources = []
-        for m in metadata:
-            sources.append(m.get("heading","unknown"))
+            #init stream
+            self.socketio.emit('answer-start', {"query": query, "sources": sources})
 
-        query_answer = {
-            "query": query,
-            "answer": answer,
-            "sources": sources,
-        }
+            ask_with_context(self.llm, self.socketio, query, context)
 
-        return query_answer
+            #end stream
+            self.socketio.emit('answer-done', {})
+
+            return None
 
 
 if __name__ == '__main__':

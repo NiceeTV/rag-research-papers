@@ -10,27 +10,46 @@ def load_llm(llm_path):
         n_ctx=4096,
         n_gpu_layers=-1,  #
         n_threads=6,
-        verbose=False,
+        verbose=True,
     )
     print("Model loaded.")
     return llm
 
-def ask_with_context(llm, question: str, context: str) -> str:
+def ask_with_context(llm, socketio, question: str, context: str):
     """
         Ask llm question using context.
     """
     prompt = f"""<|start_header_id|>system<|end_header_id|>
-        Answer the question based on the context. If you don't know, say "I don't know".<|eot_id|>
+        You are a helpful assistant. You will be given a question and a context.
+        Your task is to:
+        1. First, determine if the context is relevant to the question.
+        2. If the context is relevant, answer the question based ONLY on the context.
+        3. If the context is NOT relevant, respond with: "I don't know based on the provided documents."
+    
+        Do not use any outside knowledge.<|eot_id|>
         <|start_header_id|>user<|end_header_id|>
         Context:
         {context}
-        
+    
         Question: {question}<|eot_id|>
-        <|start_header_id|>assistant<|end_header_id|>
-    """
+        <|start_header_id|>assistant<|end_header_id|>"""
 
-    response = llm(prompt, max_tokens=512, temperature=0.2, stop=["<|eot_id|>"])
-    return response["choices"][0]["text"].strip()
+    for token in llm.create_completion(
+            prompt,
+            max_tokens=512,
+            temperature=0.2,
+            stop=["<|eot_id|>"],
+            stream=True,
+            echo=False,
+    ):
+        # token je slovník
+        if 'choices' in token and token['choices'][0].get('text'):
+            chunk = token['choices'][0]['text']
+            socketio.emit('answer-token', {'token': chunk})
+
+
+    #response = llm(prompt, max_tokens=512, temperature=0.2, stop=["<|eot_id|>"])
+    #return response["choices"][0]["text"].strip()
 
 if __name__ == "__main__":
     pass

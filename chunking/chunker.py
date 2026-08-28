@@ -163,6 +163,16 @@ def chunk_content(text: str, headings: list, tables: list, min_tokens: int = 200
             "tokens": len(content) // 4
         })
 
+    #if no headings are found, fallback and use one big chunk and divide it
+    if not raw_chunks:
+        print("No headings found, fallbacking to fixed-size chunking.")
+        raw_chunks.append({
+            "content": text,
+            "heading": 'unknown',
+            "size": len(text),
+            "tokens": len(text) // 4
+        })
+
     #merge smaller chunks
     merged_chunks = []
     buffer = ""

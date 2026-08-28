@@ -57,7 +57,7 @@ def load_models_background():
     print("Loading models in the background...", flush=True)
 
     embedder = load_embedder()
-    llm = load_llm("models/Meta-Llama-3.1-8B-Instruct-Q3_K_M.gguf")
+    llm = load_llm("models/Llama-3.2-3B-Instruct-Q4_K_M.gguf")
     models_loaded = True
 
     print("Models loaded.", flush=True)
@@ -102,7 +102,11 @@ def ask_question(data):
     #process question and send answer
     rag_p = rag_pipelines[session_id]
     result = rag_p.ask_context(query)
-    socketio.emit('ask-answer', result)
+
+    if result:
+        print("result", result)
+        socketio.emit('ask-answer', result)
+
 
 @socketio.on('start-upload')
 def handle_start_upload(data):
@@ -143,7 +147,7 @@ def handle_start_upload(data):
 @socketio.on('upload-chunk')
 def handle_upload_chunk(data):
     """
-        Receiveing a chunk.
+        Receiving a chunk.
     """
     try:
         file_id = data['fileId']

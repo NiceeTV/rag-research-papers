@@ -310,7 +310,7 @@ def save_extracted_data(pdf_path: str, text_by_page: dict, table_data: dict, out
 
 if __name__ == "__main__":
     #"attention is all you need" paper
-    """pdf_path = "../data/raw/attention_is_all_you_need.pdf"
+    """pdf_path = "../data/raw/vyhlasenie_studenta.pdf"
 
     #open pdf with pymupdf
     doc = pymupdf.open(pdf_path)
