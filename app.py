@@ -1,4 +1,7 @@
 import base64
+import gc
+import shutil
+import sys
 import time
 import os
 import uuid
@@ -6,6 +9,7 @@ from datetime import datetime
 import threading
 from pathlib import Path
 
+import chromadb
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, join_room
@@ -14,8 +18,12 @@ from embedding.embedder import load_embedder
 from llm_integration.llm_integration import load_llm
 from rag_pipeline.complete_pipeline import RAG_pipeline
 
+from chromadb.api import ClientAPI
+
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
+app.config['TEMPLATES_AUTO_RELOAD'] = True #refresh template when changed so we dont have to reset server everytime
 socketio = SocketIO(app,
                     cors_allowed_origins="*",
                     ping_timeout=3600,
@@ -24,10 +32,17 @@ socketio = SocketIO(app,
                     )
 
 
-UPLOAD_FOLDER = 'uploads'
 SESSION_FOLDER = 'sessions'
+UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+#create new session folder, delete old sessions
+if os.path.exists(SESSION_FOLDER):
+    shutil.rmtree(SESSION_FOLDER, ignore_errors=True)
+
+#create sessions folder
 os.makedirs(SESSION_FOLDER, exist_ok=True)
+
 
 rag_pipelines = {}
 models_loaded = False
@@ -115,6 +130,39 @@ def handle_start_upload(data):
     """
     file_name = data['fileName']
     file_size = data['fileSize']
+    session_id = data.get("session_id", "")
+
+    if session_id:
+        session_path = Path(f"./sessions/{session_id}")
+
+        #remove old reference
+        old_rag = rag_pipelines.get(session_id)
+
+        if old_rag:
+            try:
+                #try to delete collection
+                old_rag.collection.delete()
+            except:
+                pass
+
+            #close client
+            try:
+                old_rag.chroma_client.close()
+            except:
+                pass
+
+            old_rag.collection = None
+            old_rag.chroma_client = None #close db connection
+            rag_pipelines[session_id] = None
+
+        #run garbage collector
+        gc.collect()
+        time.sleep(1)
+
+        if session_path.exists():
+            shutil.rmtree(session_path)
+            print(f"Removed old session: {session_id}")
+
     session_id = str(uuid.uuid4()) #create unique session id for user
 
     #check size limit

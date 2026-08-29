@@ -1,6 +1,7 @@
 /* CONSTANTS */
 const file_input = document.getElementById("file_input");
 const upload_btn = document.getElementById("upload_btn");
+const reset_btn = document.getElementById("reset_upload");
 const progress_cont = document.getElementById("progress_container");
 const processed_file = document.getElementById("processed_file");
 const progress_perc = document.getElementById("progress_perc");
@@ -10,7 +11,7 @@ const fileInfo = document.getElementById('fileInfo');
 const send_msg_btn = document.getElementById("message_send_btn");
 const msg_area = document.getElementById("message_area");
 const msg_cont = document.getElementById("msg_container");
-let s_id = localStorage.getItem("session_id");
+let s_id = sessionStorage.getItem("session_id");
 
 const chat = document.getElementById("chat");
 const socket = io({
@@ -34,10 +35,22 @@ function upload_file(file) {
     progress_perc.textContent = '0%';
     progress_ws.textContent = 'Initialization...';
 
+    /** UI reset **/
+    /* hide chat and reset chat_history */
+    if (chat && chat.classList.contains('visible')) {
+        chat.classList.remove('visible');
+    }
+    sessionStorage.setItem('chat_history','');
+    if (msg_cont) {
+        msg_cont.innerHTML = '';
+    }
+    /** UI reset end **/
+
     /* init the upload */
     socket.emit('start-upload', {
         fileName: file.name,
-        fileSize: file.size
+        fileSize: file.size,
+        session_id: s_id,
     });
 
     /* wait for confirmation, then start sending chunks */
@@ -48,7 +61,7 @@ function upload_file(file) {
     /* if no confirmation */
     setTimeout(() => {
         if (is_uploading && !current_file_id) {
-            statusText.textContent = 'Server is not responding.';
+            progress_ws.textContent = 'Server is not responding.';
         }
     }, 5000);
 }
@@ -167,21 +180,91 @@ function send_msg_to_cont(message="", role="user", srcs="") {
     return el;
 }
 
+/* save and load chats on refresh */
+function save_chat() {
+    const messages = [];
+    msg_cont.querySelectorAll('.message').forEach(el => {
+        messages.push({
+            text: el.textContent.trim(),
+            role: el.classList.contains('user') ? 'user' : 'assistant',
+            sources: el.getAttribute('title') || ''
+        });
+    });
+
+    console.log('messages saved',messages);
+
+    /* save to local storage */
+    sessionStorage.setItem('chat_history', JSON.stringify(messages));
+}
+
+function load_chat() {
+    const data = sessionStorage.getItem('chat_history');
+    if (!data) return;
+
+    /* show chat */
+    chat.className = "visible";
+    
+    const messages = JSON.parse(data);
+    msg_cont.innerHTML = ''; /* clear container */
+    
+    messages.forEach(msg => {
+        send_msg_to_cont(msg.text, msg.role, msg.sources);
+    });
+};
+
+function load_ui() {
+    /* load progress and file info */
+    const file_info = sessionStorage.getItem("file_info");
+    if (!file_info) { /* no file info, invalid entry */
+        return;
+    }
+
+    if (processed_file) {
+        processed_file.textContent = file_info;
+        processed_file.title = file_info;
+    }
+
+    const perc = parseFloat(sessionStorage.getItem("progress_perc"));
+
+    if (progress_bar && progress_perc && perc) {
+        progress_bar.style.width = `${perc}%`;
+        progress_perc.textContent = `${perc}%`;
+    }
+
+    const status_text = sessionStorage.getItem("progress_ws");
+    if (status_text) {
+        progress_ws.textContent = status_text;
+    }
+
+    /* show upload and chat container */
+    progress_cont.className = "visible";
+    chat.className = "visible";
+
+    /* hide upload_btn */
+    upload_btn.style.display = 'none';
+};
+
 
 /* EVENTS */
 file_input.addEventListener("change",e => {
     const file = e.target.files[0];
     if (file) handle_file(file);
-})
+});
 
 /* upload file to backend */
-upload_btn.addEventListener("click", ()=> {
+upload_btn.addEventListener("click", (e)=> {
     file_input.click();
     
     setTimeout(() => {
-        upload_btn.style.display = 'none';
+        e.target.style.display = 'none';
     }, 300);
-})
+});
+
+reset_btn.addEventListener("click", (e)=> {
+    file_input.click();
+});
+
+
 
 /* send message with button */
 send_msg_btn.addEventListener("click", ()=> {
@@ -196,7 +279,8 @@ send_msg_btn.addEventListener("click", ()=> {
 
     /* clear input */
     msg_area.value = '';
-})
+    save_chat(); 
+});
 
 /* send message with Enter while on textarea */
 msg_area.addEventListener('keydown', function(event) {
@@ -214,6 +298,7 @@ msg_area.addEventListener('keydown', function(event) {
 
         /* clear input */
         msg_area.value = '';
+        save_chat(); 
     }
 });
 
@@ -243,7 +328,9 @@ socket.on('upload-started', (data) => {
     /* receive session id */
     s_id = data.sessionId;
     console.log('nove s_id',s_id);
-    localStorage.setItem('session_id', s_id);
+
+    sessionStorage.setItem('chat_history', '');
+    sessionStorage.setItem('session_id', s_id);
 });
 
 /* backend received our chunk, update progress */
@@ -299,12 +386,18 @@ socket.on('pipeline-status', (data) => {
         progress_perc.textContent = '100%';
         progress_bar.style.width = '100%';
         chat.className = "visible";
+
+        /* save ui text to sessionStorage */
+        sessionStorage.setItem("file_info", processed_file.textContent);
+        sessionStorage.setItem("progress_perc", parseInt(progress_perc.textContent.replace('%', '')));
+        sessionStorage.setItem("progress_ws", progress_ws.textContent);
     }
 });
 
 /* receive answer to our question */
 socket.on('ask-answer', (data) => {
     send_msg_to_cont(data.answer, "assistant", data.sources);
+    save_chat(); 
 });
 
 /* answer streaming */
@@ -322,6 +415,7 @@ socket.on('answer-token', (data) => {
 
 socket.on('answer-done', (data) => {
     answer_stream = null;
+    save_chat(); 
 });
 
 
@@ -342,3 +436,7 @@ socket.on('model-ready', (data) => {
 socket.on('disconnect', () => {
     console.log('Disconnected from server.');
 });
+
+/* INIT */
+load_chat();
+load_ui();

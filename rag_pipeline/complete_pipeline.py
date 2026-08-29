@@ -10,10 +10,11 @@ from llm_integration.llm_integration import ask_with_context
 
 class RAG_pipeline:
     def __init__(self, embedder, llm, chroma_db_path, socketio):
-        self.collection = None
         self.embedder = embedder
         self.llm = llm
         self.chroma_db = chroma_db_path
+        self.chroma_client = None
+        self.collection = None
         self.socketio = socketio
         self.chunk_revelance_threshold = 0.5
 
@@ -71,6 +72,7 @@ class RAG_pipeline:
         #create embeddings and save to db
         client, collection = create_embeddings_and_store(merged_chunks, self.embedder, self.chroma_db)
         self.collection = collection
+        self.chroma_client = client #for closing db
         print("Pipeline finished")
         self.send_ws_state("Finished")
 

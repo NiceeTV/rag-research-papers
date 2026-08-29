@@ -14,27 +14,35 @@
             <hr style="width:95%;">
         </div>
 
-        <div class="chat_container">
+        <div class="container">
             <div class="upload_container">
                 <input type="file" id="file_input" accept=".pdf,application/pdf" hidden>
                 <button id="upload_btn">Upload PDF</button>
                 <div id="fileInfo"></div>
                 <div id="progress_container">
-                    <span id="processed_file"></span>
+                    <div class="div1">
+                        <div class="top_row">
+                            <span id="processed_file"></span>
+                            <button id="reset_upload" title="New Upload"><img src="../static/icons/reset_btn.png" alt="Reset" width="24" height="24"></button>
+                        </div>
 
-                    <div class="progress-row">
                         <div class="progress-wrapper">
                             <div class="progress_bg"></div>
                             <div id="progress_bar"></div>
                         </div>
+
+                        <span id="progress_ws"></span>
+                    </div>
+
+                    <div class="div2">
                         <span id="progress_perc"></span>
                     </div>
-                    
-                    <span id="progress_ws"></span>
+
+            
                 </div>
             </div>
             
-            <div style="height: 100%; width:100%; display: flex; flex-direction: column; align-items: center;">
+            <div class="chat_container">
                 <div id="chat">
                     <div id="msg_container">
                     </div>

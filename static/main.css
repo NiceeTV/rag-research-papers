@@ -40,7 +40,7 @@ h1, h2, h3 {
 }
 
 
-.chat_container {
+.container {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -57,10 +57,10 @@ h1, h2, h3 {
 	position: relative; 
 }
 
-#upload_btn {
+#upload_btn{
 	padding: 14px 16px;
-	border-radius: 25px;
 	border: 1px solid #bfbfbf;
+	border-radius: 25px;
 	background-color: #d9d9d9; 
 	color: #4d4d4d;
 	width: fit-content;
@@ -78,9 +78,11 @@ h1, h2, h3 {
 	background-color: #bfbfbf;
 }
 
+
+/* progress info */
 #progress_container {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
 	justify-content: flex-start;
 	position: relative;
 	height: 142px;
@@ -92,7 +94,6 @@ h1, h2, h3 {
 
 #progress_container.visible {
 	max-height: fit-content;
-
 }
 
 .progress-row {
@@ -108,7 +109,6 @@ h1, h2, h3 {
 
 .progress-wrapper {
     position: relative;
-    flex: 1; /* Zaberie zvyšok miesta */
     height: 37px;
 }
 
@@ -131,7 +131,7 @@ h1, h2, h3 {
 	top: 0;
 	left: 0;
 	background: linear-gradient(90deg, #4CAF50, #8BC34A);
-	width: 0%;
+	width: 50%;
 	height: 37px;
 	box-sizing: border-box;
 	border-radius: 15px;
@@ -142,26 +142,28 @@ h1, h2, h3 {
 }
 
 #progress_perc {
-	min-width: 60px;
-	text-align: right;
+	min-width: 75px;
+	text-align: center;
 	display: inline-block;
 	font-size: 28px;
 	height: 35px;
     line-height: 35px;
+    margin-top: 10px;
     flex-shrink: 0;
 }
 
 
 #processed_file {
-	width: 100%;
     text-align: center;
     font-size: 28px;
     line-height: 30px;
+    height: fit-content;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    margin-bottom: 4px;
-    flex-shrink: 0;
+    flex: 1; 
+    min-width: 0;
+    max-width: 100%;
 }
 
 #progress_ws {
@@ -169,10 +171,50 @@ h1, h2, h3 {
     text-align: center;
     font-size: 25px;
     line-height: 27px;
-    margin-top: 5px;
     box-sizing: border-box;
     color: #666;
     flex-shrink: 0;
+}
+
+.div1, .div2 {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+}
+
+.div1 {
+	gap: 5px;
+	min-width: 0;
+	max-width: 100%;
+}
+
+.div2 {
+	display: flex;
+	flex-shrink: 0;
+	max-width: fit-content;
+	justify-content: center;
+}
+
+.top_row {
+	display: flex;
+	gap: 10px;
+	max-width: 100%;
+	align-items: center;
+}
+
+#reset_upload {
+	display: flex;
+	justify-content: center;
+	border: 1px solid #bfbfbf;
+	border-radius: 25px;
+	background-color: white; 
+	padding: 6px;
+	color: red;
+	flex-shrink: 0;
+}
+
+#reset_upload:hover {
+	background-color: rgba(255, 0, 0, 0.1);
 }
 
 
@@ -237,6 +279,7 @@ h1, h2, h3 {
 	flex-direction: column;
 	gap: 10px;
 	flex: 1;
+	padding: 5px;
 	overflow-y: auto;
 	box-sizing: border-box;
 }
