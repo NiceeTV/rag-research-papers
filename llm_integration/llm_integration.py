@@ -33,7 +33,7 @@ def ask_with_context(llm, socketio, question: str, context: str):
     
         Question: {question}<|eot_id|>
         <|start_header_id|>assistant<|end_header_id|>"""
-
+    answer = ""
     for token in llm.create_completion(
             prompt,
             max_tokens=512,
@@ -45,11 +45,10 @@ def ask_with_context(llm, socketio, question: str, context: str):
         # token je slovník
         if 'choices' in token and token['choices'][0].get('text'):
             chunk = token['choices'][0]['text']
+            answer += chunk
             socketio.emit('answer-token', {'token': chunk})
 
-
-    #response = llm(prompt, max_tokens=512, temperature=0.2, stop=["<|eot_id|>"])
-    #return response["choices"][0]["text"].strip()
+    return answer
 
 if __name__ == "__main__":
     pass

@@ -1,5 +1,7 @@
 import os
 
+import chromadb
+from chromadb import Settings
 from dotenv import load_dotenv
 from pymupdf import pymupdf
 
@@ -24,6 +26,17 @@ class RAG_pipeline:
             "state":state,
             "part": part
         })
+
+
+    def load_collection(self):
+        client = chromadb.PersistentClient(
+            path=self.chroma_db,
+            settings=Settings(anonymized_telemetry=False)
+        )
+
+        collection = client.get_collection("chunks")
+        self.collection = collection
+        self.chroma_client = client
 
 
     def run_pipeline(self, pdf_path):
@@ -104,7 +117,8 @@ class RAG_pipeline:
             return {
                 "query": query,
                 "answer": "I don't know based on the provided documents.",
-                "sources": []
+                "sources": [],
+                "streamed": False,
             }
 
         token_appr = len(context) // 4
@@ -113,6 +127,7 @@ class RAG_pipeline:
                 "query": query,
                 "answer": "This question exceeds the model context.",
                 "sources": [],
+                "streamed": False,
             }
 
         else:
@@ -123,12 +138,17 @@ class RAG_pipeline:
             #init stream
             self.socketio.emit('answer-start', {"query": query, "sources": sources})
 
-            ask_with_context(self.llm, self.socketio, query, context)
+            answer = ask_with_context(self.llm, self.socketio, query, context)
 
             #end stream
             self.socketio.emit('answer-done', {})
 
-            return None
+            return {
+                "query": query,
+                "answer": answer,
+                "sources": sources,
+                "streamed": True,
+            }
 
 
 if __name__ == '__main__':

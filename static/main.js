@@ -1,7 +1,8 @@
 /* CONSTANTS */
 const file_input = document.getElementById("file_input");
 const upload_btn = document.getElementById("upload_btn");
-const reset_btn = document.getElementById("reset_upload");
+const new_chat_btn = document.getElementById("new_chat");
+const download_btn = document.getElementById("download_chat");
 const progress_cont = document.getElementById("progress_container");
 const processed_file = document.getElementById("processed_file");
 const progress_perc = document.getElementById("progress_perc");
@@ -11,9 +12,10 @@ const fileInfo = document.getElementById('fileInfo');
 const send_msg_btn = document.getElementById("message_send_btn");
 const msg_area = document.getElementById("message_area");
 const msg_cont = document.getElementById("msg_container");
-let s_id = sessionStorage.getItem("session_id");
-
 const chat = document.getElementById("chat");
+const sidebar = document.getElementById("sidebar");
+
+let s_id = sessionStorage.getItem("session_id");
 const socket = io({
                 maxHttpBufferSize: 50 * 1024 * 1024, /* max size of socket message, 50MB*/
                 transports: ['websocket', 'polling'],
@@ -24,6 +26,9 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; /* 50 MB file limit */
 const CHUNK_SIZE = 512 * 1024; /* 512 KB per chunk */
 let is_uploading = false;
 let current_file_id = null;
+const session_cache = {};
+let active_session_btn = null;
+let models_ready = null;
 
 /* FUNCTIONS */
 function upload_file(file) {
@@ -197,52 +202,49 @@ function save_chat() {
     sessionStorage.setItem('chat_history', JSON.stringify(messages));
 }
 
-function load_chat() {
-    const data = sessionStorage.getItem('chat_history');
-    if (!data) return;
+/* load session info */
+function load_session(session_id) {
+    if (session_id in session_cache) {
+        const session_data = session_cache[session_id];
+        load_session_from_data(session_data);
+        console.log(`CACHE: Loading ${session_id} from cache.`)
+    }
+    else {
+        socket.emit('load-session', { session_id: session_id });
+    }
+}
 
-    /* show chat */
+/* load UI data from session data */
+function load_session_from_data(data) {
+    console.log('data load',data);
+    const session_id = data.session_id;
+    if (session_id) {
+        session_cache[session_id] = data;
+    }
+
+    /* load ui */
+    /* load progress and file info */
+    if (processed_file) {
+        processed_file.textContent = data.file_name;
+        processed_file.title = data.file_name;
+    }
+
+    /* show upload and chat container */
+    progress_cont.className = "";
     chat.className = "visible";
     
-    const messages = JSON.parse(data);
+    const messages = data.messages;
     msg_cont.innerHTML = ''; /* clear container */
     
     messages.forEach(msg => {
         send_msg_to_cont(msg.text, msg.role, msg.sources);
     });
-};
-
-function load_ui() {
-    /* load progress and file info */
-    const file_info = sessionStorage.getItem("file_info");
-    if (!file_info) { /* no file info, invalid entry */
-        return;
-    }
-
-    if (processed_file) {
-        processed_file.textContent = file_info;
-        processed_file.title = file_info;
-    }
-
-    const perc = parseFloat(sessionStorage.getItem("progress_perc"));
-
-    if (progress_bar && progress_perc && perc) {
-        progress_bar.style.width = `${perc}%`;
-        progress_perc.textContent = `${perc}%`;
-    }
-
-    const status_text = sessionStorage.getItem("progress_ws");
-    if (status_text) {
-        progress_ws.textContent = status_text;
-    }
-
-    /* show upload and chat container */
-    progress_cont.className = "visible";
-    chat.className = "visible";
 
     /* hide upload_btn */
     upload_btn.style.display = 'none';
-};
+
+    console.log('Loading session:',data.session_id);
+}
 
 
 /* EVENTS */
@@ -260,14 +262,50 @@ upload_btn.addEventListener("click", (e)=> {
     }, 300);
 });
 
-reset_btn.addEventListener("click", (e)=> {
+/* upload another file */
+new_chat_btn.addEventListener("click", (e)=> {
     file_input.click();
 });
 
+/* export chat to markdown */
+download_btn.addEventListener("click", (e)=> {
+    /* get chat info and messages from sessionStorage */
+    const filename = sessionStorage.getItem("file_info") || 'unknown';
+    const now = new Date().toLocaleString();
+    const sessionId = sessionStorage.getItem("session_id") || 'unknown';
+    const model = 'Llama 3.2 3B'; /* todo: to change */
+    const chat_history = sessionStorage.getItem("chat_history") || '[]';
+    const messages = JSON.parse(chat_history);  
+
+    /* create markdown */
+    let markdown = `# Chat export: ${filename}\n\n`;
+    markdown += `**Date:** ${now}\n\n`;
+    markdown += `**Session ID:** ${sessionId}\n\n`;
+    markdown += `**Model:** ${model}\n\n`;
+    markdown += `**Number of messages:** ${messages.length}\n\n---\n\n`;
+
+    messages.forEach(msg => {
+        markdown += `## ${msg.role}\n`;
+        if (msg.sources) markdown += `*(${msg.sources})*\n`;
+        markdown += `${msg.text}\n\n`;
+    });
+
+    markdown += `\n---\n*Export generated ${new Date().toLocaleString()}*`;
+
+    /* download the export */
+    const blob = new Blob([markdown], {type: 'text/markdown'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chat_${filename.replace('.pdf', '')}_${new Date().toISOString().slice(0,10)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+});
 
 
 /* send message with button */
 send_msg_btn.addEventListener("click", ()=> {
+    if (!models_ready) return;
     const message = msg_area.value;
     send_msg_to_cont(message);
 
@@ -284,6 +322,7 @@ send_msg_btn.addEventListener("click", ()=> {
 
 /* send message with Enter while on textarea */
 msg_area.addEventListener('keydown', function(event) {
+    if (!models_ready) return;
     if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault(); /* dont make newline */
         
@@ -302,8 +341,32 @@ msg_area.addEventListener('keydown', function(event) {
     }
 });
 
+sidebar.addEventListener('click', e => {
+    const target = e.target;
+    if (target.classList.contains('sidebar_chat')) {
+        const session_id = target.dataset.session_id;
+        if (session_id) {
+            load_session(session_id);
+        }
+
+        /* remove old active session btn */
+        if (active_session_btn) {
+            active_session_btn.classList.remove('active');
+        }
+
+        /* select as active session */
+        active_session_btn = target;
+        target.classList.add('active');
+    }
+})
+
 /* sockets */
 socket.on('connect', () => {
+    if (s_id) {
+        console.log('haloo',s_id);
+        load_session(s_id);
+    }
+
     console.log('Connected to server');
 });
 
@@ -313,11 +376,67 @@ socket.on('connected', (data) => {
     const model_state = data.models_ready;
     console.log('model state', model_state);
 
+    models_ready = model_state;
     if (model_state === false) {
         upload_btn.disabled = true;
         upload_btn.title = "Models are not ready yet. Please wait.";
+
+        /* disable chat sending*/
+        msg_area.disabled = true;
+        msg_area.title = "Models are not ready yet. Please wait.";
+
+        /* disable send button */
+        send_msg_btn.disabled = true;
+        send_msg_btn.title = "Models are not ready yet. Please wait.";
+    }
+
+    /* sessions list */
+    const session_list = data.sessions;
+    console.log('sessions', session_list);
+    if (session_list && session_list.length > 0) {
+        if (session_list && sidebar) {
+            /* clear sidebar */
+            sidebar.querySelectorAll('.sidebar_chat').forEach(el => el.remove());
+
+            session_list.forEach(s => {
+                /* add session to list */
+                const chat_div = document.createElement("div");
+                chat_div.className = "sidebar_chat";
+                chat_div.title = s.file_name;
+                chat_div.dataset.session_id = s.session_id;
+
+                const chat_span = document.createElement("span");
+                chat_span.className = "sidebar_chat_text";
+                chat_span.textContent = s.file_name;
+
+                chat_div.appendChild(chat_span);
+                sidebar.appendChild(chat_div);
+            })
+
+            /* set most recent as active */
+            const most_recent = sidebar.children[1]; /* 0 is toolbar */
+            if (most_recent) {
+                if (active_session_btn) {
+                    active_session_btn.classList.remove('active');
+                }
+
+                most_recent.classList.add('active');
+                active_session_btn = most_recent;
+            }
+            else {
+                /* no sessions, show upload btn */
+                upload_btn.style.display = 'block';
+            }
+        }
     }
 });
+
+
+/* load user session */
+socket.on('session-loaded', (data) => {
+    load_session_from_data(data);
+});
+
 
 /* backend confirmed our upload init, receive session_id */
 socket.on('upload-started', (data) => {
@@ -423,11 +542,23 @@ socket.on('answer-done', (data) => {
 /* when models are loaded, signal will come */
 socket.on('model-ready', (data) => {
     upload_btn.disabled = false;
+    msg_area.disabled = false;
+    send_msg_btn.disabled = false;
+    models_ready = true;
 
     upload_btn.style.backgroundColor = '#a6a6a6';
+    msg_area.style.backgroundColor = '#a6a6a6';
+    send_msg_btn.style.backgroundColor = '#a6a6a6';
+
     setTimeout(() => {
         upload_btn.style.backgroundColor = '';
         upload_btn.title = '';
+
+        msg_area.style.backgroundColor = '';
+        msg_area.title = '';
+
+        send_msg_btn.style.backgroundColor = '';
+        send_msg_btn.title = '';
     }, 1000);
 
 });
@@ -436,7 +567,3 @@ socket.on('model-ready', (data) => {
 socket.on('disconnect', () => {
     console.log('Disconnected from server.');
 });
-
-/* INIT */
-load_chat();
-load_ui();

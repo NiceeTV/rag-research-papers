@@ -8,52 +8,62 @@
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 </head>
 <body>    
-    <div class="container">
+    <div style="display: flex; height: 100%; flex-direction: column;">
         <div class="static_title">
             <h1>RAG for research papers</h1>
-            <hr style="width:95%;">
+            <hr style="width:100%; margin-bottom: 0;">
         </div>
 
-        <div class="container">
-            <div class="upload_container">
-                <input type="file" id="file_input" accept=".pdf,application/pdf" hidden>
-                <button id="upload_btn">Upload PDF</button>
-                <div id="fileInfo"></div>
-                <div id="progress_container">
-                    <div class="div1">
-                        <div class="top_row">
+        <div id="main_container">
+            <div id="sidebar">
+                <div class="sidebar_toolbar" title="Toolbar">
+                    <button id="new_chat" class="sidebar_btn" title="Create New Chat"><img src="../static/icons/new_chat_btn.png" alt="New Chat" width="24" height="24"></button>
+                    <button class="sidebar_btn" title="Settings"><img src="../static/icons/settings_icon.png" alt="Settings" width="24" height="24"></button>
+                    <button class="sidebar_btn" title="Close Sidebar"><img src="../static/icons/sidebar_icon.png" alt="Close Sidebar" width="24" height="24"></button>
+                </div>
+
+
+            </div>
+
+            <div class="container">
+                <div class="upload_container">
+                    <input type="file" id="file_input" accept=".pdf,application/pdf" hidden>
+                    <button id="upload_btn">Upload PDF</button>
+                    <div id="fileInfo"></div>
+                    <div id="progress_container">
+                        <div class="progress_left_col">
                             <span id="processed_file"></span>
-                            <button id="reset_upload" title="New Upload"><img src="../static/icons/reset_btn.png" alt="Reset" width="24" height="24"></button>
+                            
+                            <div class="progress-wrapper">
+                                <div class="progress_bg"></div>
+                                <div id="progress_bar"></div>
+                            </div>
+
+                            <span id="progress_ws"></span>
                         </div>
 
-                        <div class="progress-wrapper">
-                            <div class="progress_bg"></div>
-                            <div id="progress_bar"></div>
+                        <div class="progress_right_col">
+                            <span id="progress_perc"></span>
                         </div>
 
-                        <span id="progress_ws"></span>
-                    </div>
-
-                    <div class="div2">
-                        <span id="progress_perc"></span>
-                    </div>
-
-            
-                </div>
-            </div>
-            
-            <div class="chat_container">
-                <div id="chat">
-                    <div id="msg_container">
-                    </div>
                 
-                    <div id="controls">
-                        <textarea id="message_area" placeholder="Input message ..."></textarea>
-                        <button id="message_send_btn">Send</button>
+                    </div>
+                </div>
+                
+                <div class="chat_container">
+                    <div id="chat">
+                        <button id="download_chat" title="Download Chat"><img src="../static/icons/download_btn.png" alt="Download" width="24" height="24"></button>
+                        <div id="msg_container"></div>
+                    
+                        <div id="controls">
+                            <textarea id="message_area" placeholder="Input message ..."></textarea>
+                            <button id="message_send_btn">Send</button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+        
     </div>
     
 

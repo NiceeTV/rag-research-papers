@@ -1,5 +1,6 @@
 import base64
 import gc
+import json
 import shutil
 import sys
 import time
@@ -8,6 +9,7 @@ import uuid
 from datetime import datetime
 import threading
 from pathlib import Path
+from typing import Any
 
 import chromadb
 from dotenv import load_dotenv
@@ -17,8 +19,6 @@ from flask_socketio import SocketIO, join_room
 from embedding.embedder import load_embedder
 from llm_integration.llm_integration import load_llm
 from rag_pipeline.complete_pipeline import RAG_pipeline
-
-from chromadb.api import ClientAPI
 
 
 app = Flask(__name__)
@@ -31,16 +31,12 @@ socketio = SocketIO(app,
                     ping_interval=25
                     )
 
-
+#folder names
 SESSION_FOLDER = 'sessions'
 UPLOAD_FOLDER = 'uploads'
+
+#create upload and session folders if they dont exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-#create new session folder, delete old sessions
-if os.path.exists(SESSION_FOLDER):
-    shutil.rmtree(SESSION_FOLDER, ignore_errors=True)
-
-#create sessions folder
 os.makedirs(SESSION_FOLDER, exist_ok=True)
 
 
@@ -50,7 +46,9 @@ models_loaded = False
 @socketio.on('connect')
 def handle_connect():
     print('Client connected:', request.sid)
-    socketio.emit('connected', {'message': 'Connected to server', "models_ready": models_loaded})
+
+    sessions = get_all_sessions()
+    socketio.emit('connected', {'message': 'Connected to server', "models_ready": models_loaded, 'sessions': sessions})
 
 @app.route('/')
 def index():
@@ -61,6 +59,115 @@ uploads = {}
 #upload limits
 MAX_FILE_SIZE = 50 * 1024 * 1024 #50 MB
 CHUNK_SIZE = 512 * 1024 #512 KB chunks
+
+#session management
+def get_session_path(session_id: str) -> Path:
+    """
+        Get path of the session folder.
+    """
+    return Path(f"./sessions/{session_id}")
+
+def get_session_info_path(session_id: str) -> Path:
+    """
+        Get session_info path from the session folder.
+    """
+    return get_session_path(session_id) / "session_info.json"
+
+def load_session_info(session_id: str) -> Any | None:
+    """
+        Get session_info.
+    """
+    path = get_session_info_path(session_id)
+    if path.exists():
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return None
+
+def save_session_info(session_id: str, info: dict):
+    """
+        Save updated session_info to session.
+    """
+    path = get_session_info_path(session_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    info["updated_at"] = datetime.now().isoformat()
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(info, f, indent=2, ensure_ascii=False)
+
+def add_message(session_id: str, role: str, text: str, sources: list = None):
+    """
+        Add message to chat_history.
+    """
+    info = load_session_info(session_id)
+    if info is None:
+        info = {
+            "session_id": session_id,
+            "file_name": "unknown",
+            "messages": []
+        }
+
+    if "messages" not in info:
+        info["messages"] = []
+
+    info["messages"].append({
+        "role": role,
+        "text": text,
+        "sources": sources or [],
+        "timestamp": datetime.now().isoformat()
+    })
+    save_session_info(session_id, info)
+
+@socketio.on('load-session')
+def handle_load_session(data):
+    """
+        Send session info to frontend.
+    """
+    session_id = data['session_id']
+    info = load_session_info(session_id)
+    if info:
+        socketio.emit('session-loaded', {
+            'file_name': info.get('original_filename', 'unknown'),
+            'messages': info.get('messages', []),
+            'session_id': session_id
+        })
+
+
+#get session list
+def get_all_sessions() -> list:
+    """
+        Returns session list with their metadata.
+    """
+    sessions = []
+    sessions_path = Path("./sessions")
+
+    if not sessions_path.exists():
+        return sessions
+
+    for session_path in sessions_path.iterdir():
+        if session_path.is_dir():
+            info_path = session_path / "session_info.json"
+            if info_path.exists():
+                try:
+                    with open(info_path, "r", encoding="utf-8") as f:
+                        info = json.load(f)
+                    sessions.append({
+                        "session_id": session_path.name,
+                        "file_name": info.get("original_filename", info.get("stored_filename", "unknown")),
+                        "created_at": info.get("created_at", ""),
+                        "message_count": len(info.get("messages", [])),
+                        "file_size": info.get("file_size", 0)
+                    })
+                except:
+                    pass
+
+    #sort by date
+    sessions.sort(key=lambda x: x["created_at"], reverse=True)
+    return sessions
+
+@socketio.on('get-sessions')
+def handle_get_sessions():
+    sessions = get_all_sessions()
+    socketio.emit('sessions-list', {'sessions': sessions})
+
 
 #init llm and embedder
 def load_models_background():
@@ -97,6 +204,12 @@ def run_rag_pipeline(session_id: str, pdf_path: str):
         rag_p.run_pipeline(pdf_path)
         rag_pipelines[session_id] = rag_p
 
+        info = load_session_info(session_id) or {"session_id": session_id}
+        info["file_size"] = str(Path(pdf_path).stat().st_size)
+        info["created_at"] = datetime.now().isoformat()
+        info["model"] = "Llama 3.2 3B" #change later
+        save_session_info(session_id, info)
+
         socketio.emit('pipeline-ready', {
             'sessionId': session_id,
             'message': 'PDF processed.'
@@ -115,11 +228,36 @@ def ask_question(data):
         return
 
     #process question and send answer
+    if not session_id in rag_pipelines:
+        #create new rag_pipeline
+
+        #get session folder
+        session_path = Path(SESSION_FOLDER) / session_id
+
+        if session_path.exists():
+            rag_p = RAG_pipeline(
+                chroma_db_path=str(session_path / "chroma_db"),
+                llm=llm,
+                embedder=embedder,
+                socketio=socketio
+            )
+
+            #load collection from chromadb
+            rag_p.load_collection()
+
+            #save to loaded pipelines
+            rag_pipelines[session_id] = rag_p
+        else:
+            print("Error: Non-existing session.")
+
+
     rag_p = rag_pipelines[session_id]
     result = rag_p.ask_context(query)
+    add_message(session_id, "user", query) #add my message to chat_history
 
-    if result:
+    if result and not result["streamed"]:
         print("result", result)
+        add_message(session_id, "assistant", result["answer"], result["sources"])
         socketio.emit('ask-answer', result)
 
 
@@ -158,10 +296,6 @@ def handle_start_upload(data):
         #run garbage collector
         gc.collect()
         time.sleep(1)
-
-        if session_path.exists():
-            shutil.rmtree(session_path)
-            print(f"Removed old session: {session_id}")
 
     session_id = str(uuid.uuid4()) #create unique session id for user
 
@@ -271,6 +405,11 @@ def complete_upload(file_id):
             f.write(file_bytes)
 
         print(f'File saved: {filepath} ({len(file_bytes)} bytes)')
+
+        #save to session info
+        info = load_session_info(session_id) or {"session_id": session_id}
+        info["original_filename"] = upload_data['name'] #original name
+        save_session_info(session_id, info)
 
         #send confirmation
         socketio.emit('upload-complete', {
